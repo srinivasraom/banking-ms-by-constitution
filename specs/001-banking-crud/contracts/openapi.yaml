@@ -1,0 +1,857 @@
+openapi: 3.1.0
+info:
+  title: Banking Microservices API
+  description: |
+    RESTful API for banking operations including customer management,
+    account management, and transaction processing.
+
+    ## Authentication
+    All endpoints except `/auth/login` and `/auth/register` require a valid JWT token
+    in the Authorization header: `Bearer <token>`
+
+    ## Rate Limiting
+    - Authentication endpoints: 5 requests/minute
+    - Read operations: 100 requests/minute
+    - Write operations: 30 requests/minute
+  version: 1.0.0
+  contact:
+    name: API Support
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development
+  - url: https://api.example.com/v1
+    description: Production
+
+tags:
+  - name: Authentication
+    description: User authentication and registration
+  - name: Customers
+    description: Customer profile management
+  - name: Accounts
+    description: Bank account management
+  - name: Transactions
+    description: Transaction recording and history
+
+paths:
+  # ============================================================================
+  # AUTHENTICATION
+  # ============================================================================
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new customer
+      operationId: registerCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerCreate'
+      responses:
+        '201':
+          description: Customer registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate and get JWT token
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      operationId: refreshToken
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================================
+  # CUSTOMERS
+  # ============================================================================
+  /customers/me:
+    get:
+      tags: [Customers]
+      summary: Get current customer profile
+      operationId: getCurrentCustomer
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Customer profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Customers]
+      summary: Update current customer profile
+      operationId: updateCurrentCustomer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdate'
+      responses:
+        '200':
+          description: Customer updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags: [Customers]
+      summary: Deactivate current customer profile
+      description: Customer must have no active accounts to deactivate
+      operationId: deactivateCurrentCustomer
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Customer deactivated successfully
+        '400':
+          description: Cannot deactivate - has active accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================================
+  # ACCOUNTS
+  # ============================================================================
+  /accounts:
+    get:
+      tags: [Accounts]
+      summary: List customer accounts
+      operationId: listAccounts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/AccountStatus'
+          description: Filter by account status
+      responses:
+        '200':
+          description: List of accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AccountResponse'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Accounts]
+      summary: Create a new account
+      operationId: createAccount
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountCreate'
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /accounts/{account_number}:
+    parameters:
+      - name: account_number
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^\d{16}$'
+        description: 16-digit account number
+
+    get:
+      tags: [Accounts]
+      summary: Get account details
+      operationId: getAccount
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Accounts]
+      summary: Update account settings
+      operationId: updateAccount
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountUpdate'
+      responses:
+        '200':
+          description: Account updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Accounts]
+      summary: Close an account
+      description: Account must have zero balance to close
+      operationId: closeAccount
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Account closed successfully
+        '400':
+          description: Cannot close - balance is not zero
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # TRANSACTIONS
+  # ============================================================================
+  /accounts/{account_number}/transactions:
+    parameters:
+      - name: account_number
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^\d{16}$'
+
+    get:
+      tags: [Transactions]
+      summary: Get transaction history
+      operationId: listTransactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter transactions from this date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter transactions until this date
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/TransactionType'
+          description: Filter by transaction type
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Cursor for pagination
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: Number of transactions to return
+      responses:
+        '200':
+          description: Transaction history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Transactions]
+      summary: Create a transaction (deposit or withdrawal)
+      operationId: createTransaction
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionCreate'
+      responses:
+        '201':
+          description: Transaction created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '400':
+          description: Validation error or insufficient funds
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /accounts/{account_number}/transactions/{reference}:
+    parameters:
+      - name: account_number
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^\d{16}$'
+      - name: reference
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^TXN[A-Z0-9]+$'
+
+    get:
+      tags: [Transactions]
+      summary: Get transaction details
+      operationId: getTransaction
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # HEALTH & METRICS
+  # ============================================================================
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy]
+                  version:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /health/ready:
+    get:
+      summary: Readiness check
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ready]
+                  database:
+                    type: string
+                    enum: [connected]
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ========== ENUMS ==========
+    CustomerStatus:
+      type: string
+      enum: [active, inactive]
+
+    AccountType:
+      type: string
+      enum: [checking, savings]
+
+    AccountStatus:
+      type: string
+      enum: [active, closed]
+
+    TransactionType:
+      type: string
+      enum: [deposit, withdrawal]
+
+    # ========== AUTH ==========
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          enum: [bearer]
+        expires_in:
+          type: integer
+          description: Token expiration in seconds
+
+    # ========== CUSTOMER ==========
+    CustomerCreate:
+      type: object
+      required:
+        - email
+        - password
+        - first_name
+        - last_name
+        - phone
+        - address_line1
+        - city
+        - state
+        - postal_code
+        - date_of_birth
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        phone:
+          type: string
+          pattern: '^\+[1-9]\d{1,14}$'
+          description: E.164 format phone number
+        address_line1:
+          type: string
+          minLength: 1
+          maxLength: 255
+        address_line2:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          minLength: 1
+          maxLength: 100
+        state:
+          type: string
+          minLength: 1
+          maxLength: 100
+        postal_code:
+          type: string
+          minLength: 1
+          maxLength: 20
+        country:
+          type: string
+          pattern: '^[A-Z]{2}$'
+          default: US
+        date_of_birth:
+          type: string
+          format: date
+
+    CustomerUpdate:
+      type: object
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        phone:
+          type: string
+          pattern: '^\+[1-9]\d{1,14}$'
+        address_line1:
+          type: string
+          minLength: 1
+          maxLength: 255
+        address_line2:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          minLength: 1
+          maxLength: 100
+        state:
+          type: string
+          minLength: 1
+          maxLength: 100
+        postal_code:
+          type: string
+          minLength: 1
+          maxLength: 20
+        country:
+          type: string
+          pattern: '^[A-Z]{2}$'
+
+    CustomerResponse:
+      type: object
+      properties:
+        customer_id:
+          type: string
+          example: CUST00000001
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone:
+          type: string
+        address_line1:
+          type: string
+        address_line2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+        date_of_birth:
+          type: string
+          format: date
+        status:
+          $ref: '#/components/schemas/CustomerStatus'
+        created_at:
+          type: string
+          format: date-time
+
+    # ========== ACCOUNT ==========
+    AccountCreate:
+      type: object
+      required: [account_type]
+      properties:
+        account_type:
+          $ref: '#/components/schemas/AccountType'
+        initial_deposit:
+          type: number
+          format: decimal
+          minimum: 0
+          default: 0
+        nickname:
+          type: string
+          maxLength: 50
+
+    AccountUpdate:
+      type: object
+      properties:
+        nickname:
+          type: string
+          maxLength: 50
+        notify_on_transaction:
+          type: boolean
+
+    AccountResponse:
+      type: object
+      properties:
+        account_number:
+          type: string
+          example: '1234567890123456'
+        account_type:
+          $ref: '#/components/schemas/AccountType'
+        balance:
+          type: number
+          format: decimal
+          example: 1000.50
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+        nickname:
+          type: string
+        notify_on_transaction:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    # ========== TRANSACTION ==========
+    TransactionCreate:
+      type: object
+      required: [transaction_type, amount]
+      properties:
+        transaction_type:
+          $ref: '#/components/schemas/TransactionType'
+        amount:
+          type: number
+          format: decimal
+          exclusiveMinimum: 0
+          example: 100.00
+        description:
+          type: string
+          maxLength: 255
+
+    TransactionResponse:
+      type: object
+      properties:
+        reference:
+          type: string
+          example: TXN20260116ABC123
+        transaction_type:
+          $ref: '#/components/schemas/TransactionType'
+        amount:
+          type: number
+          format: decimal
+        balance_after:
+          type: number
+          format: decimal
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    TransactionListResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionResponse'
+        total:
+          type: integer
+        next_cursor:
+          type: string
+          description: Cursor for next page, null if no more results
+
+    # ========== ERROR ==========
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid input data
+            details:
+              type: object
+              additionalProperties: true
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION_ERROR]
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication required or token invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Invalid or expired token
+              details: {}
+
+    Forbidden:
+      description: Access denied to this resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: FORBIDDEN
+              message: You do not have permission to access this resource
+              details: {}
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: NOT_FOUND
+              message: The requested resource was not found
+              details: {}
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
