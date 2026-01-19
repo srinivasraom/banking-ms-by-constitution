@@ -98,12 +98,12 @@ graph LR
 
 ```mermaid
 graph TB
-    subgraph "API Layer (/api/v1)"
-        AUTH_EP[/auth]
-        ACCT_EP[/accounts]
-        CUST_EP[/customers]
-        TXN_EP[/transactions]
-        HEALTH_EP[/health]
+    subgraph API["API Layer"]
+        AUTH_EP["auth"]
+        ACCT_EP["accounts"]
+        CUST_EP["customers"]
+        TXN_EP["transactions"]
+        HEALTH_EP["health"]
     end
 
     subgraph "Service Layer"
