@@ -159,89 +159,50 @@ This matrix enables:
 Figure 1 illustrates the Spec-Driven Development architecture for our reference implementation. The Constitution sits at the apex of the development hierarchy, governing all downstream artifacts. Feature specifications must comply with constitutional principles before implementation planning begins. Plans decompose into tasks that carry constitutional requirements to the implementation layer, where AI-assisted code generation operates within defined security bounds.
 
 ```mermaid
-graph TB
-    subgraph SpecDriven["Spec-Driven Development Layer"]
-        Constitution["Constitution<br/>CWE/MITRE Principles<br/>Security Requirements"]
-        Spec["Feature Specification<br/>spec.md"]
-        Plan["Implementation Plan<br/>plan.md"]
-        Tasks["Task Definitions<br/>tasks.md"]
-        Compliance["Compliance Matrix<br/>File:Line Traceability"]
+flowchart TB
+    subgraph Constitution["CONSTITUTION - Security Foundation"]
+        direction LR
+        CWE["CWE/MITRE Top 25"]
+        Principles["Security Principles"]
+        Rules["Non-Negotiable Rules"]
     end
 
-    subgraph AILayer["AI-Assisted Generation"]
-        AIGen["AI Code Generator<br/>Constrained by Constitution"]
-        Validation["Constitutional Validation<br/>Reject Non-Compliant Code"]
+    subgraph SpecLayer["SPECIFICATION LAYER"]
+        direction LR
+        Spec["spec.md<br/>Feature Requirements"]
+        Plan["plan.md<br/>Implementation Design"]
+        Tasks["tasks.md<br/>Atomic Work Items"]
     end
 
-    subgraph Implementation["Banking Microservices Implementation"]
-        subgraph Frontend["Frontend - React + TypeScript"]
-            Auth[Auth Context]
-            AcctHooks[Accounts Hooks]
-            TxnHooks[Transactions Hooks]
-            APIClient[API Client Layer]
-        end
-
-        subgraph Backend["Backend - FastAPI + Python"]
-            subgraph Middleware["Middleware Layer"]
-                CORS[CORS]
-                CorrID[Correlation ID]
-                ErrHandler[Error Handling]
-            end
-
-            subgraph API["API Layer"]
-                AuthEP["auth endpoint"]
-                CustEP["customers endpoint"]
-                AcctEP["accounts endpoint"]
-                TxnEP["transactions endpoint"]
-            end
-
-            subgraph Services["Service Layer"]
-                CustSvc[CustomerService]
-                AcctSvc[AccountService]
-                TxnSvc[TransactionService]
-            end
-
-            subgraph Data["Data Layer - SQLAlchemy ORM"]
-                CustModel[Customer]
-                AcctModel[Account]
-                TxnModel[Transaction]
-                AuditModel[AuditLog]
-            end
-        end
-
-        subgraph Database["Database"]
-            DB[(SQLite or PostgreSQL)]
-        end
+    subgraph AILayer["AI-ASSISTED GENERATION"]
+        direction LR
+        Generator["AI Code Generator"]
+        Validator["Constitutional Validator"]
     end
 
-    Constitution -->|"Constrains"| Spec
-    Spec -->|"Informs"| Plan
-    Plan -->|"Decomposes into"| Tasks
-    Tasks -->|"Guides"| AIGen
-    Constitution -->|"Validates"| AIGen
-    AIGen -->|"Generates"| Validation
-    Validation -->|"Approved Code"| Implementation
-    Implementation -->|"Maps to"| Compliance
-    Compliance -->|"Traces back to"| Constitution
+    subgraph Implementation["IMPLEMENTATION - Banking Microservices"]
+        direction LR
+        Frontend["React Frontend"]
+        Backend["FastAPI Backend"]
+        Database["Database"]
+    end
 
-    Auth --> APIClient
-    AcctHooks --> APIClient
-    TxnHooks --> APIClient
-    APIClient -->|HTTPS + JWT| CORS
-    CORS --> CorrID
-    CorrID --> ErrHandler
-    ErrHandler --> API
-    AuthEP --> CustSvc
-    CustEP --> CustSvc
-    AcctEP --> AcctSvc
-    TxnEP --> TxnSvc
-    CustSvc --> CustModel
-    AcctSvc --> AcctModel
-    TxnSvc --> TxnModel
-    CustSvc --> AuditModel
-    AcctSvc --> AuditModel
-    TxnSvc --> AuditModel
-    Data --> DB
+    subgraph Traceability["COMPLIANCE TRACEABILITY"]
+        Matrix["Compliance Matrix<br/>Principle → File:Line"]
+    end
+
+    Constitution -->|"1. Constrains"| SpecLayer
+    SpecLayer -->|"2. Guides"| AILayer
+    Constitution -.->|"3. Validates"| AILayer
+    AILayer -->|"4. Generates"| Implementation
+    Implementation -->|"5. Maps to"| Traceability
+    Traceability -->|"6. Traces back"| Constitution
+
+    style Constitution fill:#e74c3c,color:#fff
+    style SpecLayer fill:#3498db,color:#fff
+    style AILayer fill:#9b59b6,color:#fff
+    style Implementation fill:#27ae60,color:#fff
+    style Traceability fill:#f39c12,color:#fff
 ```
 
 *Figure 1: Spec-Driven Development Architecture with Constitutional Constraints*
